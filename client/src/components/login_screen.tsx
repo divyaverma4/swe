@@ -28,7 +28,7 @@ export function LoginScreen() {
         <div className="w-full max-w-6xl">
           <div className="text-center mb-12">
             <h1 className="text-5xl md:text-6xl font-bold mb-4 text-balance">
-              Welcome to <span className="text-primary">Pinspire</span>
+              Welcome to <span className="text-primary">ARTichoke</span>
             </h1>
             <p className="text-lg text-muted-foreground text-balance">Discover ideas, create inspiration</p>
           </div>
