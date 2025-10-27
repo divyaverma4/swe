@@ -2,17 +2,12 @@
 
 import React from "react";
 import { useState } from 'react'
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@/utils/supabase/client'
+import { Session } from '@supabase/supabase-js'
 
-import { LoginScreen } from "@/components/login_screen"
-
-const SUPABASE_URL = 'https://psfumeaxgcsemrlzbuwq.supabase.co'
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZnVtZWF4Z2NzZW1ybHpidXdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MTI4NjcsImV4cCI6MjA3NjE4ODg2N30.MJQ7ctg8kJEKVEW9DKxcQTTt0ZpaQa_n4qcdO2z78Us'
-
-const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-
-export default function authPage() {
+export default function AuthPage() {
+  const supabase = createClient()
+  
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [status, setStatus] = useState<string>('')
@@ -44,12 +39,58 @@ export default function authPage() {
     } else {
       setStatus(`✅ Logged in as ${data.user?.email}`)
       console.log(data)
+    
+      await handleCheckBackend(data.session)
     }
   }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setStatus('Logged out.')
+  }
+
+  const handleCheckBackend = async (session: Session | null = null) => {
+    setStatus('Checking backend status...')
+
+    let sessionToUse = session
+    if (!sessionToUse) {
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        setStatus(`❌ Error getting session: ${sessionError.message}`)
+        return
+      }
+      sessionToUse = currentSession
+    }
+
+    if (!sessionToUse) {
+      setStatus('❌ You must be logged in to check the backend.')
+      return
+    }
+
+    const token = sessionToUse.access_token
+    try {
+      const response = await fetch('http://localhost:5001/status', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.message || 'Error from backend')
+      }
+
+      // Update status to show the backend result
+      setStatus(`✅ Backend OK: ${data.message} (User: ${data.user_email})`)
+      console.log(data)
+
+    } catch (error: any) {
+      // Prepend to the existing status instead of replacing it
+      setStatus(prevStatus => `${prevStatus}\n... ❌ Backend error: ${error.message}`)
+      console.error(error)
+    }
   }
 
   return (
@@ -92,8 +133,7 @@ export default function authPage() {
           Log Out
         </button>
       </div>
-
-      <p className="text-sm mt-2">{status}</p>
+      <p className="text-sm mt-2 whitespace-pre-wrap">{status}</p>
     </div>
   )
 }
