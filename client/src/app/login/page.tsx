@@ -82,7 +82,7 @@ export default function AuthPage() {
 
     const token = sessionToUse.access_token
     try {
-      const response = await fetch("http://localhost:3001/status", {
+      const response = await fetch("http://localhost:5001/status", {
         method: "GET",
         headers: { Authorization: `Bearer ${token}` },
       })
