@@ -2,7 +2,7 @@
 ## Steps to set up the project
 1. cd into client and run `npm install` This will install all nextjs dependencies used in the project
 2. Go back into root folder
-3. cd into server and run `python3 -m venv venv'
+3. cd into server and run `python3 -m venv venv`
 4. This step will depend whether you are on windows or macOS, both achieve the same result
   - Windows:
     - Using command prompt: venv\Scripts\activate.bat
