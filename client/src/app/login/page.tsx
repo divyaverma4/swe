@@ -17,6 +17,7 @@ export default function AuthPage() {
   const router = useRouter()
 
   const [loginType, setLoginType] = useState<LoginType>(null)
+  const [hovered, setHovered] = useState<LoginType>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [status, setStatus] = useState<string>("")
@@ -24,6 +25,7 @@ export default function AuthPage() {
   // -------- AUTH HANDLERS --------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!loginType) return
     setStatus("🔐 Logging in...")
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -31,12 +33,16 @@ export default function AuthPage() {
       setStatus(`❌ ${error.message}`)
       console.error(error)
     } else {
-      setStatus(`✅ Logged in as ${data.user?.email}`)
+      // Custom message based on login type
+      if (loginType === "user") {
+        setStatus(`✅ Welcome back, user! Ready to explore inspiring ideas?`)
+      } else {
+        setStatus(`✅ Welcome back, creator! Time to share your work with the world!`)
+      }
       console.log("Login success:", data)
       await handleCheckBackend(data.session)
+      router.push(`/home?type=${loginType}`)
 
-      // Redirect after login
-      router.push("/home")
     }
   }
 
@@ -83,7 +89,7 @@ export default function AuthPage() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || "Error from backend")
 
-      setStatus(`✅ Backend OK: ${data.message} (User: ${data.user_email})`)
+      setStatus(prev => `${prev}\n✅ Backend OK: ${data.message} (User: ${data.user_email})`)
     } catch (error: any) {
       setStatus(prev => `${prev}\n... ❌ Backend error: ${error.message}`)
       console.error(error)
@@ -107,19 +113,41 @@ export default function AuthPage() {
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {/* User Login Card */}
             <Card
-              className="group relative overflow-hidden cursor-pointer transition-all hover:shadow-2xl hover:scale-[1.02] border-2 hover:border-primary/50"
+              className={`group relative overflow-hidden cursor-pointer transition-all border-2 hover:shadow-2xl hover:scale-[1.02] ${
+                loginType === "user"
+                  ? "border-primary bg-primary/10"
+                  : hovered === "user"
+                  ? "border-primary/60 bg-primary/5"
+                  : "border-muted hover:border-primary/50"
+              }`}
+              onMouseEnter={() => setHovered("user")}
+              onMouseLeave={() => setHovered(null)}
               onClick={() => setLoginType("user")}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative p-8 md:p-10">
-                <div className="mb-6 inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary">
+                <div
+                  className={`mb-6 inline-flex items-center justify-center w-16 h-16 rounded-full transition-all ${
+                    loginType === "user" || hovered === "user"
+                      ? "bg-primary/20 text-primary"
+                      : "bg-primary/10 text-primary"
+                  }`}
+                >
                   <User className="w-8 h-8" />
                 </div>
                 <h2 className="text-3xl font-bold mb-3">I'm a User</h2>
                 <p className="text-muted-foreground mb-6 leading-relaxed">
                   Browse, save, and organize inspiring ideas from creators around the world
                 </p>
-                <Button className="w-full mt-8 h-12 text-base font-semibold">
+                <Button
+                  className={`w-full mt-8 h-12 text-base font-semibold transition-colors ${
+                    loginType === "user"
+                      ? "bg-primary text-white"
+                      : hovered === "user"
+                      ? "bg-primary/90 text-white"
+                      : ""
+                  }`}
+                >
                   Continue as User
                 </Button>
               </div>
@@ -127,19 +155,29 @@ export default function AuthPage() {
 
             {/* Creator Login Card */}
             <Card
-              className="group relative overflow-hidden cursor-pointer transition-all hover:shadow-2xl hover:scale-[1.02] border-2 hover:border-secondary/50"
+              className={`group relative overflow-hidden cursor-pointer transition-all border-0 hover:shadow-2xl hover:scale-[1.02]`}
+              onMouseEnter={() => setHovered("creator")}
+              onMouseLeave={() => setHovered(null)}
               onClick={() => setLoginType("creator")}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative p-8 md:p-10">
-                <div className="mb-6 inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary/10 text-secondary">
+                <div
+                  className={`mb-6 inline-flex items-center justify-center w-16 h-16 rounded-full transition-all ${
+                    loginType === "creator" || hovered === "creator"
+                      ? "bg-black/20 text-black"
+                      : "bg-black/10 text-black"
+                  }`}
+                >
                   <Sparkles className="w-8 h-8" />
                 </div>
                 <h2 className="text-3xl font-bold mb-3">I'm a Creator</h2>
                 <p className="text-muted-foreground mb-6 leading-relaxed">
                   Share your work, grow your audience, and inspire millions of people
                 </p>
-                <Button className="w-full mt-8 h-12 text-base font-semibold bg-secondary hover:bg-secondary/90 text-secondary-foreground">
+                <Button
+                  className={`w-full mt-8 h-12 text-base font-semibold transition-colors bg-black text-white hover:bg-gray-900`}
+                >
                   Continue as Creator
                 </Button>
               </div>
@@ -156,7 +194,7 @@ export default function AuthPage() {
       {/* Left Side */}
       <div
         className={`hidden lg:flex lg:w-1/2 relative overflow-hidden ${
-          loginType === "user" ? "bg-primary" : "bg-secondary"
+          loginType === "user" ? "bg-primary" : "bg-black"
         }`}
       >
         <div className="absolute inset-0 opacity-10">
@@ -225,9 +263,7 @@ export default function AuthPage() {
             <Button
               type="submit"
               className={`w-full h-12 text-base font-semibold ${
-                loginType === "creator"
-                  ? "bg-secondary hover:bg-secondary/90 text-secondary-foreground"
-                  : ""
+                loginType === "creator" ? "bg-black hover:bg-gray-900 text-white" : "bg-primary text-white"
               }`}
             >
               Sign in
