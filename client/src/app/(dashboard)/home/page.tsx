@@ -1,4 +1,4 @@
-"use client"   // <- add this at the very top
+"use client"
 
 import React from "react"
 import { useSearchParams } from "next/navigation"
@@ -8,12 +8,12 @@ const page = () => {
   const loginType = searchParams.get("type") // "user" or "creator"
 
   return (
-    <div className="p-8 text-center">
+    <div className="p-8 text-center text-black">
       <h1 className="text-2xl font-bold mb-4">
         Congratulations! You have logged in successfully.
       </h1>
       {loginType && (
-        <p className="text-lg text-muted-foreground">
+        <p className="text-lg">
           You are logged in as a <strong>{loginType}</strong>.
         </p>
       )}
