@@ -48,7 +48,15 @@ export default function AuthPage() {
 
   const handleSignup = async () => {
     setStatus("✉️ Signing up...")
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password, 
+      options: {
+        data: {
+          user_type: loginType 
+        }
+      } 
+    })
     if (error) {
       setStatus(`❌ ${error.message}`)
     } else {
