@@ -34,11 +34,6 @@ const NavBar = () => {
           </Link>
         </li>
         <li>
-          <Link href="/explore" className={getLinkClass("/explore")}>
-            <Compass size={30} strokeWidth={2} />
-          </Link>
-        </li>
-        <li>
           <Link href="/profile" className={getLinkClass("/profile")}>
             <User size={30} strokeWidth={2} />
           </Link>
@@ -46,8 +41,8 @@ const NavBar = () => {
       </ul>
       <ul>
         <li>
-          <Link href="/settings" className={getLinkClass("/settings")}>
-            <Settings size={30} strokeWidth={2} />
+          <Link href="/login" className={getLinkClass("/login")}>
+            Log out
           </Link>
         </li>
       </ul>
