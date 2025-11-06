@@ -148,13 +148,8 @@ export default function AuthPage() {
                   Browse, save, and organize inspiring ideas from creators around the world
                 </p>
                 <Button
-                  className={`w-full mt-8 h-12 text-base font-semibold transition-colors ${
-                    loginType === "user"
-                      ? "bg-primary text-white"
-                      : hovered === "user"
-                      ? "bg-primary/90 text-white"
-                      : ""
-                  }`}
+                  variant="default"
+                  className="w-full mt-8 h-12 text-base font-semibold"
                 >
                   Continue as User
                 </Button>
@@ -184,7 +179,8 @@ export default function AuthPage() {
                   Share your work, grow your audience, and inspire millions of people
                 </p>
                 <Button
-                  className={`w-full mt-8 h-12 text-base font-semibold transition-colors bg-black text-white hover:bg-gray-900`}
+                  variant="default"
+                  className="w-full mt-8 h-12 text-base font-semibold"
                 >
                   Continue as Creator
                 </Button>
@@ -270,9 +266,8 @@ export default function AuthPage() {
 
             <Button
               type="submit"
-              className={`w-full h-12 text-base font-semibold ${
-                loginType === "creator" ? "bg-black hover:bg-gray-900 text-white" : "bg-primary text-white"
-              }`}
+              variant={loginType === "creator" ? "secondary" : "default"} // Move logic here
+              className="w-full h-12 text-base font-semibold"
             >
               Sign in
             </Button>
