@@ -127,9 +127,7 @@ const page = () => {
                 placeholder="Search artwork..."
                 className="px-4 py-2 rounded-full bg-muted text-foreground placeholder-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              <button className="px-6 py-2 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity">
-                Explore
-              </button>
+
             </div>
           </div>
         </div>
