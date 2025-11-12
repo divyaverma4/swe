@@ -16,35 +16,48 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SquarePlus } from "lucide-react"
+import { createClient } from "@/utils/supabase/client"
 
-const UploadDialog = () => {
+interface UploadDialogProps {
+  onUpload?: () => void | Promise<void>
+}
+
+
+const UploadDialog = ({ onUpload }: UploadDialogProps) => {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     image: null as File | null,
   })
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
-  const getCurrentDate = () => {
-    return new Date().toISOString().split("T")[0]
-  }
+  const getCurrentDate = () => new Date().toISOString().split("T")[0]
 
-
+  const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const validTypes = ["application/pdf", "image/png", "image/jpeg"]
-      const validExtensions = ["pdf", "png", "jpeg", "jpg"]
-      const fileExtension = file.name.split(".").pop()?.toLowerCase()
+    if (!file) return
 
-      if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension || "")) {
-        setError("Please upload a PDF, PNG, JPEG, or JPG file.")
-        return
-      }
-      setError("")
-      setFormData({ ...formData, image: file })
+    const validTypes = ["image/png", "image/jpeg"]
+    const fileExtension = file.name.split(".").pop()?.toLowerCase()
+
+    if (!validTypes.includes(file.type) || (fileExtension && !["png", "jpeg", "jpg"].includes(fileExtension))) {
+      setError("Please upload an image file (PNG or JPEG).")
+      setFormData({ ...formData, image: null })
+      return
     }
+
+    if (file.size > MAX_BYTES) {
+      setError("File is too large. Maximum size is 10 MB.")
+      setFormData({ ...formData, image: null })
+      return
+    }
+
+    setError("")
+    setFormData({ ...formData, image: file })
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -52,8 +65,9 @@ const UploadDialog = () => {
     setFormData({ ...formData, [name]: value })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSuccess(false)
     if (!formData.title.trim()) {
       setError("Artwork title is required.")
       return
@@ -62,13 +76,55 @@ const UploadDialog = () => {
       setError("Image file is required.")
       return
     }
-    console.log("Form submitted:", {
-      ...formData,
-      dateUploaded: getCurrentDate()
-    })
-    // Reset form after submission
-    setFormData({ title: "", description: "", image: null })
-    setError("")
+
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      if (!token) throw new Error("Not authenticated")
+
+      const fd = new FormData()
+      fd.append("title", formData.title)
+      fd.append("description", formData.description)
+      // use key 'file' on the backend
+      fd.append("file", formData.image)
+
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5001"}/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: fd,
+      })
+
+      if (!resp.ok) {
+        // Try to read JSON, otherwise fall back to text for richer error messages
+        let body: any = null
+        try {
+          body = await resp.json()
+        } catch (e) {
+          try {
+            body = await resp.text()
+          } catch (e2) {
+            body = null
+          }
+        }
+        const serverMessage = body?.message || body || `Upload failed (${resp.status})`
+        throw new Error(serverMessage)
+      }
+
+      setSuccess(true)
+      setFormData({ title: "", description: "", image: null })
+      setError("")
+      // call optional callback so page can refresh the gallery
+      if (onUpload) await onUpload()
+    } catch (err: any) {
+      console.error(err)
+      setError(err?.message || "Upload failed")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -80,65 +136,79 @@ const UploadDialog = () => {
           </Button>
         </DialogTrigger>
 
-        <DialogContent className="sm:max-w-[425px]">
+  <DialogContent className="sm:max-w-[600px] w-full">
           <DialogHeader>
             <DialogTitle>Upload Artwork</DialogTitle>
             <DialogDescription>
-              Upload images of your artwork here. Fill in all required fields and click submit when you're done.
+              Upload images of your artwork here. Accepted formats: PNG, JPEG (max 10MB).
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <Label htmlFor="title" className="sm:w-1/4 w-full sm:text-right text-left">
                 Artwork Title *
               </Label>
-              <Input
-                id="title"
-                name="title"
-                placeholder="Enter title"
-                value={formData.title}
-                onChange={handleInputChange}
-                className="col-span-3"
-              />
+              <div className="sm:w-3/4 w-full">
+                <Input
+                  id="title"
+                  name="title"
+                  placeholder="Enter title"
+                  value={formData.title}
+                  onChange={handleInputChange}
+                  className="w-full"
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="date" className="text-right">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <Label htmlFor="date" className="sm:w-1/4 w-full sm:text-right text-left">
                 Date Uploaded
               </Label>
-              <Input id="date" type="text" value={getCurrentDate()} disabled className="col-span-3 bg-muted" />
+              <div className="sm:w-3/4 w-full">
+                <Input id="date" type="text" value={getCurrentDate()} disabled className="bg-muted w-full" />
+              </div>
             </div>
 
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="image" className="text-right">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <Label htmlFor="image" className="sm:w-1/4 w-full sm:text-right text-left">
                 Image File *
               </Label>
-              <Input
-                id="image"
-                type="file"
-                accept=".pdf,.png,.jpeg,.jpg"
-                onChange={handleFileChange}
-                className="col-span-3"
-              />
+              <div className="sm:w-3/4 w-full">
+                <input
+                  id="image"
+                  name="image"
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  onChange={handleFileChange}
+                  className="w-full"
+                  aria-describedby="upload-help"
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="description" className="text-right pt-2">
+            <div id="upload-help" className="w-full text-sm text-muted-foreground text-center sm:text-left sm:pl-4">
+              Accepted formats: PNG, JPEG. Max size: 10MB.
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              <Label htmlFor="description" className="sm:w-1/4 w-full sm:text-right text-left pt-2">
                 Description
               </Label>
-              <textarea
-                id="description"
-                name="description"
-                placeholder="Enter description (optional)"
-                value={formData.description}
-                onChange={handleInputChange}
-                className="col-span-3 min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
+              <div className="sm:w-3/4 w-full">
+                <textarea
+                  id="description"
+                  name="description"
+                  placeholder="Enter description (optional)"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full"
+                />
+              </div>
             </div>
 
             {error && <div className="text-sm text-destructive">{error}</div>}
+            {success && <div className="text-sm text-success">Upload successful.</div>}
 
             <DialogFooter>
               <DialogClose asChild>
@@ -146,7 +216,7 @@ const UploadDialog = () => {
                   Close
                 </Button>
               </DialogClose>
-              <Button type="submit">Upload Artwork</Button>
+              <Button type="submit" disabled={loading}>{loading ? "Uploading..." : "Upload Artwork"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
