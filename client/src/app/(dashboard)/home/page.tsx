@@ -84,6 +84,7 @@ const page = () => {
   const searchParams = useSearchParams();
   const loginType = searchParams.get("type"); // "user" or "creator"
   const [artworks, setArtworks] = useState<Artwork[]>([]);
+  const [query, setQuery] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flags, setFlags] = useState<Record<string, { liked: boolean; saved: boolean }>>({});
@@ -186,7 +187,9 @@ const page = () => {
             <div className="flex gap-4">
               <input
                 type="text"
-                placeholder="Search artwork..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search artwork or author..."
                 className="px-4 py-2 rounded-full bg-muted text-foreground placeholder-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <UploadDialog onUpload={fetchArtworks} />
@@ -199,7 +202,15 @@ const page = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Artwork Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {artworks.map((artwork) => {
+          {(
+            artworks.filter((a) => {
+              const q = query.trim().toLowerCase();
+              if (!q) return true;
+              const title = (a.title || "").toLowerCase();
+              const username = (a.username || a.user_id || "").toLowerCase();
+              return title.includes(q) || username.includes(q);
+            })
+          ).map((artwork) => {
             const f = flags[artwork.id] || { liked: false, saved: false }
             const ui: UIArtwork = {
               id: artwork.id,
