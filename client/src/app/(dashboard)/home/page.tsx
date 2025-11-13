@@ -103,15 +103,12 @@ const page = () => {
 
       const userId = sessionData.session.user?.id
 
-      // Fetch artworks according to RLS (this will return public artworks and the user's own private artworks)
-      const { data: rows, error: rowsError } = await supabase.from('artworks').select('*').order('created_at', { ascending: false })
+      // Fetch artworks (use the read-only view that includes the username)
+      const { data: rows, error: rowsError } = await supabase
+        .from('artworks_with_username')
+        .select('*')
+        .order('created_at', { ascending: false })
       if (rowsError) throw rowsError
-
-      // Collect unique user_ids to fetch usernames
-      const userIds = Array.from(new Set(rows.map((r: any) => r.user_id)))
-      const { data: profiles } = await supabase.from('profiles').select('id, username').in('id', userIds as string[])
-      const usernameById: Record<string, string> = {}
-      if (profiles) profiles.forEach((p: any) => { usernameById[p.id] = p.username || p.id })
 
       // Revoke previous object URLs
       artworks.forEach((a) => { if (a.image) URL.revokeObjectURL(a.image) })
@@ -122,7 +119,7 @@ const page = () => {
           id: row.id,
           title: row.title,
           user_id: row.user_id,
-          username: usernameById[row.user_id] || (row.user_id === userId ? 'You' : row.user_id),
+          username: row.username || (row.user_id === userId ? 'You' : row.user_id),
           image_url: row.image_url,
           is_public: row.is_public,
         }
