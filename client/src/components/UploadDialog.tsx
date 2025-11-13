@@ -111,7 +111,11 @@ const UploadDialog = ({ onUpload }: UploadDialogProps) => {
           }
         }
         const serverMessage = body?.message || body || `Upload failed (${resp.status})`
-        throw new Error(serverMessage)
+        const detailed = `Upload failed - status: ${resp.status} ${resp.statusText} - message: ${serverMessage}`
+        console.error(detailed, { status: resp.status, statusText: resp.statusText, body })
+        // surface a helpful message in the UI
+        setError(detailed)
+        return
       }
 
       setSuccess(true)
