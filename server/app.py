@@ -3,11 +3,14 @@ from flask_cors import CORS
 import jwt
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 from functools import wraps
 from supabase import create_client, Client
 import requests
 
-load_dotenv()
+# Load .env from the server directory (works whether you run from repo root or inside server/)
+env_path = Path(__file__).resolve().parent / '.env'
+load_dotenv(env_path)
 
 app = Flask(__name__)
 CORS(app) 

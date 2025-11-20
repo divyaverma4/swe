@@ -15,14 +15,12 @@ const NavBar = () => {
   
   // Helper function to dynamically set class names
   const getLinkClass = (path: string) => {
-    // Check if the current path starts with the link's path
-    const isActive = pathname.startsWith(path);
-    
-    return `flex items-center rounded-2xl p-4 cursor-pointer hover:bg-gray-300 ${ // Base styles
-      isActive
-        ? "bg-gray-300" // <-- Active style
-        : "" // <-- Inactive hover style
-    }`;
+    // Case-insensitive check if the current path starts with the link's path
+    const current = (pathname || '').toLowerCase();
+    const p = path.toLowerCase();
+    const isActive = current.startsWith(p);
+
+    return `flex items-center rounded-2xl p-4 cursor-pointer hover:bg-gray-300 ${isActive ? "bg-gray-300" : ""}`;
   };
 
   return (
@@ -34,7 +32,7 @@ const NavBar = () => {
           </Link>
         </li>
         <li>
-          <Link href="/profile" className={getLinkClass("/profile")}>
+          <Link href="/Profile" className={getLinkClass("/Profile")}>
             <User size={30} strokeWidth={2} />
           </Link>
         </li>
