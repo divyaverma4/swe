@@ -1,110 +1,120 @@
-"use client"
+"use client";
 
-import React, { useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/utils/supabase/client"
-import { Session } from "@supabase/supabase-js"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card } from "@/components/ui/card"
-import { Sparkles, User } from "lucide-react"
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
+import { Session } from "@supabase/supabase-js";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Sparkles, User } from "lucide-react";
 
-type LoginType = "user" | "creator" | null
+type LoginType = "user" | "creator" | null;
 
 export default function AuthPage() {
-  const supabase = createClient()
-  const router = useRouter()
+  const supabase = createClient();
+  const router = useRouter();
 
-  const [loginType, setLoginType] = useState<LoginType>(null)
-  const [hovered, setHovered] = useState<LoginType>(null)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [status, setStatus] = useState<string>("")
+  const [loginType, setLoginType] = useState<LoginType>(null);
+  const [hovered, setHovered] = useState<LoginType>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<string>("");
 
-  // -------- AUTH HANDLERS --------
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!loginType) return
-    setStatus("🔐 Logging in...")
+    e.preventDefault();
+    if (!loginType) return;
+    setStatus("🔐 Logging in...");
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     if (error) {
-      setStatus(`❌ ${error.message}`)
-      console.error(error)
+      setStatus(`❌ ${error.message}`);
+      console.error(error);
     } else {
       // Custom message based on login type
       if (loginType === "user") {
-        setStatus(`✅ Welcome back, user! Ready to explore inspiring ideas?`)
+        setStatus(`✅ Welcome back, user! Ready to explore inspiring ideas?`);
       } else {
-        setStatus(`✅ Welcome back, creator! Time to share your work with the world!`)
+        setStatus(
+          `✅ Welcome back, creator! Time to share your work with the world!`
+        );
       }
-      console.log("Login success:", data)
-      await handleCheckBackend(data.session)
-      router.push(`/home?type=${loginType}`)
-
+      console.log("Login success:", data);
+      await handleCheckBackend(data.session);
+      router.push(`/home?type=${loginType}`);
     }
-  }
+  };
 
   const handleSignup = async () => {
-    setStatus("✉️ Signing up...")
-    const { data, error } = await supabase.auth.signUp({ 
-      email, 
-      password, 
+    setStatus("✉️ Signing up...");
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
       options: {
         data: {
-          user_type: loginType 
-        }
-      } 
-    })
+          user_type: loginType,
+        },
+      },
+    });
     if (error) {
-      setStatus(`❌ ${error.message}`)
+      setStatus(`❌ ${error.message}`);
     } else {
-      setStatus("✅ Sign-up successful! Check your email to confirm your account.")
-      console.log(data)
+      setStatus(
+        "✅ Sign-up successful! Check your email to confirm your account."
+      );
+      console.log(data);
     }
-  }
+  };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setStatus("🚪 Logged out.")
-  }
+    await supabase.auth.signOut();
+    setStatus("🚪 Logged out.");
+  };
 
   const handleCheckBackend = async (session: Session | null = null) => {
-    setStatus("Checking backend status...")
+    setStatus("Checking backend status...");
 
-    let sessionToUse = session
+    let sessionToUse = session;
     if (!sessionToUse) {
-      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
+      const {
+        data: { session: currentSession },
+        error: sessionError,
+      } = await supabase.auth.getSession();
       if (sessionError) {
-        setStatus(`❌ Error getting session: ${sessionError.message}`)
-        return
+        setStatus(`❌ Error getting session: ${sessionError.message}`);
+        return;
       }
-      sessionToUse = currentSession
+      sessionToUse = currentSession;
     }
 
     if (!sessionToUse) {
-      setStatus("❌ You must be logged in to check the backend.")
-      return
+      setStatus("❌ You must be logged in to check the backend.");
+      return;
     }
 
-    const token = sessionToUse.access_token
+    const token = sessionToUse.access_token;
     try {
       const response = await fetch("http://localhost:5001/status", {
         method: "GET",
         headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.message || "Error from backend")
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Error from backend");
 
-      setStatus(prev => `${prev}\n✅ Backend OK: ${data.message} (User: ${data.user_email})`)
+      setStatus(
+        (prev) =>
+          `${prev}\n✅ Backend OK: ${data.message} (User: ${data.user_email})`
+      );
     } catch (error: any) {
-      setStatus(prev => `${prev}\n... ❌ Backend error: ${error.message}`)
-      console.error(error)
+      setStatus((prev) => `${prev}\n... ❌ Backend error: ${error.message}`);
+      console.error(error);
     }
-  }
+  };
 
-  // -------- UI --------
   if (!loginType) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/30 to-background">
@@ -119,7 +129,6 @@ export default function AuthPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {/* User Login Card */}
             <Card
               className={`group relative overflow-hidden cursor-pointer transition-all border-2 hover:shadow-2xl hover:scale-[1.02] ${
                 loginType === "user"
@@ -145,7 +154,8 @@ export default function AuthPage() {
                 </div>
                 <h2 className="text-3xl font-bold mb-3">I'm a User</h2>
                 <p className="text-muted-foreground mb-6 leading-relaxed">
-                  Browse, save, and organize inspiring ideas from creators around the world
+                  Browse, save, and organize inspiring ideas from creators
+                  around the world
                 </p>
                 <Button
                   variant="default"
@@ -156,7 +166,6 @@ export default function AuthPage() {
               </div>
             </Card>
 
-            {/* Creator Login Card */}
             <Card
               className={`group relative overflow-hidden cursor-pointer transition-all border-0 hover:shadow-2xl hover:scale-[1.02]`}
               onMouseEnter={() => setHovered("creator")}
@@ -176,7 +185,8 @@ export default function AuthPage() {
                 </div>
                 <h2 className="text-3xl font-bold mb-3">I'm a Creator</h2>
                 <p className="text-muted-foreground mb-6 leading-relaxed">
-                  Share your work, grow your audience, and inspire millions of people
+                  Share your work, grow your audience, and inspire millions of
+                  people
                 </p>
                 <Button
                   variant="default"
@@ -189,13 +199,11 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  // -------- LOGIN FORM --------
   return (
     <div className="min-h-screen flex">
-      {/* Left Side */}
       <div
         className={`hidden lg:flex lg:w-1/2 relative overflow-hidden ${
           loginType === "user" ? "bg-primary" : "bg-black"
@@ -212,7 +220,9 @@ export default function AuthPage() {
             <Sparkles className="w-24 h-24 mx-auto mb-6" />
           )}
           <h2 className="text-4xl font-bold mb-4">
-            {loginType === "user" ? "Discover Your Next Idea" : "Share Your Creative Vision"}
+            {loginType === "user"
+              ? "Discover Your Next Idea"
+              : "Share Your Creative Vision"}
           </h2>
           <p className="text-lg opacity-90 max-w-md">
             {loginType === "user"
@@ -222,7 +232,6 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Right Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md">
           <button
@@ -233,8 +242,12 @@ export default function AuthPage() {
           </button>
 
           <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">Welcome back</h1>
-            <p className="text-muted-foreground">Sign in to your {loginType} account</p>
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">
+              Welcome back
+            </h1>
+            <p className="text-muted-foreground">
+              Sign in to your {loginType} account
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -266,7 +279,7 @@ export default function AuthPage() {
 
             <Button
               type="submit"
-              variant={loginType === "creator" ? "secondary" : "default"} // Move logic here
+              variant={loginType === "creator" ? "secondary" : "default"}
               className="w-full h-12 text-base font-semibold"
             >
               Sign in
@@ -297,5 +310,5 @@ export default function AuthPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

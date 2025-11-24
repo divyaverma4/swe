@@ -8,7 +8,6 @@ from functools import wraps
 from supabase import create_client, Client
 import requests
 
-# Load .env from the server directory (works whether you run from repo root or inside server/)
 env_path = Path(__file__).resolve().parent / '.env'
 load_dotenv(env_path)
 
@@ -22,9 +21,6 @@ SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 if not JWT_SECRET or not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
     raise ValueError("SUPABASE_JWT_SECRET, SUPABASE_URL, and SUPABASE_SERVICE_KEY must be set.")
 
-# --- Supabase Client ---
-# Initialize the Supabase client using the SERVICE KEY
-# This client has admin rights and bypasses RLS.
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     print("Supabase service client initialized.")
@@ -53,7 +49,6 @@ def token_required(f):
                 audience='authenticated',
                 issuer=f'{SUPABASE_URL}/auth/v1'
             )
-            # store decoded payload and raw token for later use
             g.user = payload
             g.token = token
         except jwt.ExpiredSignatureError:
@@ -81,7 +76,6 @@ def status():
     }), 200
 
 
-# Upload endpoint: accepts multipart/form-data with 'file', 'title', 'description'
 @app.route('/upload', methods=['POST'])
 @token_required
 def upload_artwork():
@@ -101,7 +95,6 @@ def upload_artwork():
     if not filename:
         return jsonify({'message': 'File must have a filename'}), 400
 
-    # Build object path: user_id/filename
     object_path = f"{user_id}/{filename}"
 
     # Upload to Supabase Storage using the user's JWT so the storage owner is the user
@@ -125,7 +118,6 @@ def upload_artwork():
         print(f"[upload] exception during upload: {e}")
         return jsonify({'message': 'Error uploading to storage', 'error': str(e)}), 500
 
-    # Insert metadata into artworks table
     title = request.form.get('title') or 'Untitled'
     description = request.form.get('description') or ''
 
@@ -138,7 +130,6 @@ def upload_artwork():
             'is_public': True
         }).execute()
 
-        # Some client libraries return a response object with `.data` and `.error`, others return tuples.
         print(f"[upload] insert_resp: {insert_resp}")
         data = getattr(insert_resp, 'data', None) or (insert_resp[0] if isinstance(insert_resp, (list, tuple)) and len(insert_resp) > 0 else None)
         err = getattr(insert_resp, 'error', None) or (insert_resp[1] if isinstance(insert_resp, (list, tuple)) and len(insert_resp) > 1 else None)
@@ -163,13 +154,10 @@ def signed_url():
         return jsonify({'message': 'path query parameter required'}), 400
 
     try:
-        # supabase.storage.from_(bucket).create_signed_url(path, expires)
         storage = supabase.storage
         res = storage.from_(bucket).create_signed_url(path, expires)
-        # res may be a dict like { 'signedURL': '...' } or have data property depending on client
         if isinstance(res, dict):
             return jsonify(res), 200
-        # Fallback when using client that returns (data, error)-like tuple
         return jsonify({'signed_url': getattr(res, 'signed_url', None) or getattr(res, 'data', None)}), 200
     except Exception as e:
         return jsonify({'message': 'Failed to create signed url', 'error': str(e)}), 500
@@ -185,12 +173,7 @@ def get_profile():
     user_id = g.user.get('sub') 
 
     try:
-        # Use the service client to fetch data
-        # We query the 'profiles' table where the 'id' column matches the user_id
         response = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
-        
-        # response.data will contain the profile data
-        # e.g., {'id': '...', 'username': 'testuser', 'avatar_url': '...'}
         
         if not response.data:
             return jsonify({'message': 'Profile not found.'}), 404
@@ -199,7 +182,6 @@ def get_profile():
 
     except Exception as e:
         print(f"Error fetching profile: {e}")
-        # Check for specific PostgREST errors if you want
         return jsonify({'message': 'Error fetching profile', 'error': str(e)}), 500
 
 
