@@ -29,6 +29,16 @@ type UIArtwork = {
   saved?: boolean;
 }
 
+const extractErrorMessage = (e: unknown): string => {
+  if (e instanceof Error) return e.message
+  if (typeof e === 'string') return e
+  try {
+    return JSON.stringify(e)
+  } catch {
+    return String(e)
+  }
+}
+
 function ArtworkCard({
   artwork,
   onToggleLike,
@@ -80,7 +90,7 @@ function ArtworkCard({
   );
 }
 
-const page = () => {
+const Page = () => {
   const searchParams = useSearchParams();
   const loginType = searchParams.get("type"); // "user" or "creator"
   const [artworks, setArtworks] = useState<Artwork[]>([]);
@@ -137,27 +147,27 @@ const page = () => {
                 const json = await resp.json()
                 art.image = json.signed_url || json.signedURL || json?.signedURL || json?.signed_url
               }
-            } catch (err) {
-              console.warn('Signed URL fallback failed for', row.image_url, err)
+            } catch (err: unknown) {
+              console.warn('Signed URL fallback failed for', row.image_url, extractErrorMessage(err))
             }
           }
-        } catch (e) {
-          console.warn('Failed to download image for', row.image_url, e)
+        } catch (e: unknown) {
+          console.warn('Failed to download image for', row.image_url, extractErrorMessage(e))
         }
 
         mapped.push(art)
       }
 
       setArtworks(mapped)
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e)
-      setError(e?.message || 'Failed to load artworks')
+      setError(extractErrorMessage(e) || 'Failed to load artworks')
     } finally {
       setLoading(false)
     }
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchArtworks()
     return () => {
       // Revoke any object URLs on unmount
@@ -234,4 +244,4 @@ const page = () => {
   );
 };
 
-export default page;
+export default Page;

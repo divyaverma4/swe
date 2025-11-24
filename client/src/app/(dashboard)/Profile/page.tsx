@@ -11,6 +11,16 @@ type Artwork = {
   image?: string;
 };
 
+const extractErrorMessage = (e: unknown): string => {
+  if (e instanceof Error) return e.message
+  if (typeof e === 'string') return e
+  try {
+    return JSON.stringify(e)
+  } catch {
+    return String(e)
+  }
+}
+
 const Page = () => {
   const supabase = createClient();
   const [profile, setProfile] = useState<{ id: string; username?: string } | null>(null);
@@ -48,15 +58,15 @@ const Page = () => {
             if (!fileError && file) {
               art.image = URL.createObjectURL(file);
             }
-          } catch (err) {
-            console.warn('Failed to download image for', r.image_url, err);
+          } catch (err: unknown) {
+            console.warn('Failed to download image for', r.image_url, extractErrorMessage(err));
           }
           mapped.push(art);
         }
         if (mounted) setArtworks(mapped);
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(e);
-        if (mounted) setError(e?.message || 'Failed to load profile');
+        if (mounted) setError(extractErrorMessage(e) || 'Failed to load profile');
       } finally {
         if (mounted) setLoading(false);
       }

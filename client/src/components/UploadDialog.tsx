@@ -37,6 +37,32 @@ const UploadDialog = ({ onUpload }: UploadDialogProps) => {
 
   const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 
+  const extractErrorMessage = (e: unknown): string => {
+    if (e instanceof Error) return e.message
+    if (typeof e === "string") return e
+    try {
+      return JSON.stringify(e)
+    } catch {
+      return String(e)
+    }
+  }
+
+  const extractBodyMessage = (body: unknown): string | null => {
+    if (body == null) return null
+    if (typeof body === "string") return body
+    if (typeof body === "object") {
+      try {
+        const b = body as Record<string, unknown>
+        if (typeof b.message === "string") return b.message
+        if (typeof b.error === "string") return b.error
+        return JSON.stringify(b)
+      } catch {
+        return String(body)
+      }
+    }
+    return String(body)
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -100,17 +126,17 @@ const UploadDialog = ({ onUpload }: UploadDialogProps) => {
 
       if (!resp.ok) {
         // Try to read JSON, otherwise fall back to text for richer error messages
-        let body: any = null
+        let body: unknown = null
         try {
           body = await resp.json()
-        } catch (e) {
+        } catch {
           try {
             body = await resp.text()
-          } catch (e2) {
+          } catch {
             body = null
           }
         }
-        const serverMessage = body?.message || body || `Upload failed (${resp.status})`
+        const serverMessage = extractBodyMessage(body) || `Upload failed (${resp.status})`
         const detailed = `Upload failed - status: ${resp.status} ${resp.statusText} - message: ${serverMessage}`
         console.error(detailed, { status: resp.status, statusText: resp.statusText, body })
         // surface a helpful message in the UI
@@ -123,9 +149,9 @@ const UploadDialog = ({ onUpload }: UploadDialogProps) => {
       setError("")
       // call optional callback so page can refresh the gallery
       if (onUpload) await onUpload()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      setError(err?.message || "Upload failed")
+      setError(extractErrorMessage(err) || "Upload failed")
     } finally {
       setLoading(false)
     }
