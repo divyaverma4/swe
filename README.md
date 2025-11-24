@@ -19,3 +19,4 @@
   - Windows: `npm run dev:win`
   - MacOS: `npm run dev:mac`
 9. The project should be running in localhost 3000
+10. **Note**: The project require keys from env files. Ask the contributor for them so you can put it in your env files.
