@@ -56,3 +56,6 @@ __pycache__/
 
 # Secrets files
 .env
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md

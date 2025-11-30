@@ -1,232 +1,37 @@
-"use client"
+import Image from "next/image"
 
-import type React from "react"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { SquarePlus } from "lucide-react"
-import { createClient } from "@/utils/supabase/client"
-
-interface UploadDialogProps {
-  onUpload?: () => void | Promise<void>
+interface Artwork {
+  id: string
+  title: string
+  image: string
+  height: number
 }
 
+interface ArtworkGalleryProps {
+  artworks: Artwork[]
+}
 
-const UploadDialog = ({ onUpload }: UploadDialogProps) => {
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    image: null as File | null,
-  })
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
-
-  const getCurrentDate = () => new Date().toISOString().split("T")[0]
-
-  const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const validTypes = ["image/png", "image/jpeg"]
-    const fileExtension = file.name.split(".").pop()?.toLowerCase()
-
-    if (!validTypes.includes(file.type) || (fileExtension && !["png", "jpeg", "jpg"].includes(fileExtension))) {
-      setError("Please upload an image file (PNG or JPEG).")
-      setFormData({ ...formData, image: null })
-      return
-    }
-
-    if (file.size > MAX_BYTES) {
-      setError("File is too large. Maximum size is 10 MB.")
-      setFormData({ ...formData, image: null })
-      return
-    }
-
-    setError("")
-    setFormData({ ...formData, image: file })
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSuccess(false)
-    if (!formData.title.trim()) {
-      setError("Artwork title is required.")
-      return
-    }
-    if (!formData.image) {
-      setError("Image file is required.")
-      return
-    }
-
-    setLoading(true)
-    try {
-      const supabase = createClient()
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData?.session?.access_token
-      if (!token) throw new Error("Not authenticated")
-
-      const fd = new FormData()
-      fd.append("title", formData.title)
-      fd.append("description", formData.description)
-      // use key 'file' on the backend
-      fd.append("file", formData.image)
-
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5001"}/upload`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: fd,
-      })
-
-      if (!resp.ok) {
-        // Try to read JSON, otherwise fall back to text for richer error messages
-        let body: any = null
-        try {
-          body = await resp.json()
-        } catch (e) {
-          try {
-            body = await resp.text()
-          } catch (e2) {
-            body = null
-          }
-        }
-        const serverMessage = body?.message || body || `Upload failed (${resp.status})`
-        const detailed = `Upload failed - status: ${resp.status} ${resp.statusText} - message: ${serverMessage}`
-        console.error(detailed, { status: resp.status, statusText: resp.statusText, body })
-        // surface a helpful message in the UI
-        setError(detailed)
-        return
-      }
-
-      setSuccess(true)
-      setFormData({ title: "", description: "", image: null })
-      setError("")
-      // call optional callback so page can refresh the gallery
-      if (onUpload) await onUpload()
-    } catch (err: any) {
-      console.error(err)
-      setError(err?.message || "Upload failed")
-    } finally {
-      setLoading(false)
-    }
-  }
-
+export function ArtworkGallery({ artworks }: ArtworkGalleryProps) {
   return (
-    <div className="p-2 text-black">
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">
-            <SquarePlus />
-          </Button>
-        </DialogTrigger>
-
-  <DialogContent className="sm:max-w-[600px] w-full">
-          <DialogHeader>
-            <DialogTitle>Upload Artwork</DialogTitle>
-            <DialogDescription>
-              Upload images of your artwork here. Accepted formats: PNG, JPEG (max 10MB).
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <Label htmlFor="title" className="sm:w-1/4 w-full sm:text-right text-left">
-                Artwork Title *
-              </Label>
-              <div className="sm:w-3/4 w-full">
-                <Input
-                  id="title"
-                  name="title"
-                  placeholder="Enter title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  className="w-full"
+    <div className="w-full bg-background">
+      <div className="max-w-6xl mx-auto px-6 py-12">
+        <div className="columns-1 sm:columns-2 lg:columns-3 gap-6">
+          {artworks.map((artwork) => (
+            <div key={artwork.id} className="break-inside-avoid mb-6 group">
+              <div className="relative overflow-hidden rounded-lg bg-card">
+                <Image
+                  src={artwork.image || "/placeholder.svg"}
+                  alt={artwork.title}
+                  width={400}
+                  height={artwork.height}
+                  className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>
+              <p className="mt-3 text-sm font-medium text-foreground">{artwork.title}</p>
             </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <Label htmlFor="date" className="sm:w-1/4 w-full sm:text-right text-left">
-                Date Uploaded
-              </Label>
-              <div className="sm:w-3/4 w-full">
-                <Input id="date" type="text" value={getCurrentDate()} disabled className="bg-muted w-full" />
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <Label htmlFor="image" className="sm:w-1/4 w-full sm:text-right text-left">
-                Image File *
-              </Label>
-              <div className="sm:w-3/4 w-full">
-                <input
-                  id="image"
-                  name="image"
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  onChange={handleFileChange}
-                  className="w-full"
-                  aria-describedby="upload-help"
-                />
-              </div>
-            </div>
-
-            <div id="upload-help" className="w-full text-sm text-muted-foreground text-center sm:text-left sm:pl-4">
-              Accepted formats: PNG, JPEG. Max size: 10MB.
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-              <Label htmlFor="description" className="sm:w-1/4 w-full sm:text-right text-left pt-2">
-                Description
-              </Label>
-              <div className="sm:w-3/4 w-full">
-                <textarea
-                  id="description"
-                  name="description"
-                  placeholder="Enter description (optional)"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full"
-                />
-              </div>
-            </div>
-
-            {error && <div className="text-sm text-destructive">{error}</div>}
-            {success && <div className="text-sm text-success">Upload successful.</div>}
-
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="secondary">
-                  Close
-                </Button>
-              </DialogClose>
-              <Button type="submit" disabled={loading}>{loading ? "Uploading..." : "Upload Artwork"}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
-
-export default UploadDialog
