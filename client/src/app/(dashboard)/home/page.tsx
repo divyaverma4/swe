@@ -7,14 +7,13 @@ import { useSearchParams } from "next/navigation";
 import UploadDialog from "@/components/UploadDialog";
 import { createClient } from "@/utils/supabase/client";
 
-// TODO: FINALIZE/EDIT ARTWORK PARAMS
 interface Artwork {
   id: string;
   title: string;
   user_id: string;
   username?: string;
-  image_url: string; // storage path like "user_id/filename"
-  image?: string; // object URL or signed URL for <img src>
+  image_url: string;
+  image?: string;
   is_public?: boolean;
 }
 
@@ -27,7 +26,17 @@ type UIArtwork = {
   height?: string;
   liked?: boolean;
   saved?: boolean;
-}
+};
+
+const extractErrorMessage = (e: unknown): string => {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
+};
 
 function ArtworkCard({
   artwork,
@@ -56,7 +65,9 @@ function ArtworkCard({
               }}
               className="p-2 rounded-full bg-white/90 text-foreground hover:bg-white shadow-lg"
             >
-              <Bookmark className={`w-5 h-5 ${artwork.saved ? "fill-foreground" : ""}`} />
+              <Bookmark
+                className={`w-5 h-5 ${artwork.saved ? "fill-foreground" : ""}`}
+              />
             </button>
           </div>
           <div className="absolute bottom-3 left-3">
@@ -67,7 +78,11 @@ function ArtworkCard({
               }}
               className="p-2 rounded-full bg-white/90 text-foreground hover:bg-white shadow-lg"
             >
-              <Heart className={`w-5 h-5 ${artwork.liked ? "fill-destructive text-destructive" : ""}`} />
+              <Heart
+                className={`w-5 h-5 ${
+                  artwork.liked ? "fill-destructive text-destructive" : ""
+                }`}
+              />
             </button>
           </div>
         </div>
@@ -80,103 +95,135 @@ function ArtworkCard({
   );
 }
 
-const page = () => {
+const Page = () => {
   const searchParams = useSearchParams();
   const loginType = searchParams.get("type"); // "user" or "creator"
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [query, setQuery] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [flags, setFlags] = useState<Record<string, { liked: boolean; saved: boolean }>>({});
+  const [flags, setFlags] = useState<
+    Record<string, { liked: boolean; saved: boolean }>
+  >({});
 
   const fetchArtworks = async () => {
     setLoading(true);
     setError(null);
     try {
       const supabase = createClient();
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
       if (sessionError || !sessionData?.session) {
-        setError('You must be logged in to view artworks.')
-        setLoading(false)
-        return
+        setError("You must be logged in to view artworks.");
+        setLoading(false);
+        return;
       }
 
-      const userId = sessionData.session.user?.id
+      const userId = sessionData.session.user?.id;
 
-      // Fetch artworks (use the read-only view that includes the username)
       const { data: rows, error: rowsError } = await supabase
-        .from('artworks_with_username')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (rowsError) throw rowsError
+        .from("artworks_with_username")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (rowsError) throw rowsError;
 
-      // Revoke previous object URLs
-      artworks.forEach((a) => { if (a.image) URL.revokeObjectURL(a.image) })
+      artworks.forEach((a) => {
+        if (a.image) URL.revokeObjectURL(a.image);
+      });
 
-      const mapped: Artwork[] = []
+      const mapped: Artwork[] = [];
       for (const row of rows) {
         const art: Artwork = {
           id: row.id,
           title: row.title,
           user_id: row.user_id,
-          username: row.username || (row.user_id === userId ? 'You' : row.user_id),
+          username:
+            row.username || (row.user_id === userId ? "You" : row.user_id),
           image_url: row.image_url,
           is_public: row.is_public,
-        }
+        };
 
         try {
-          const { data: file, error: fileError } = await supabase.storage.from('artworks').download(row.image_url)
+          const { data: file, error: fileError } = await supabase.storage
+            .from("artworks")
+            .download(row.image_url);
           if (!fileError && file) {
-            const url = URL.createObjectURL(file)
-            art.image = url
+            const url = URL.createObjectURL(file);
+            art.image = url;
           } else {
             // fallback: ask backend for a signed URL
             try {
-              const resp = await fetch(`/signed-url?path=${encodeURIComponent(row.image_url)}`)
+              const resp = await fetch(
+                `/signed-url?path=${encodeURIComponent(row.image_url)}`
+              );
               if (resp.ok) {
-                const json = await resp.json()
-                art.image = json.signed_url || json.signedURL || json?.signedURL || json?.signed_url
+                const json = await resp.json();
+                art.image =
+                  json.signed_url ||
+                  json.signedURL ||
+                  json?.signedURL ||
+                  json?.signed_url;
               }
-            } catch (err) {
-              console.warn('Signed URL fallback failed for', row.image_url, err)
+            } catch (err: unknown) {
+              console.warn(
+                "Signed URL fallback failed for",
+                row.image_url,
+                extractErrorMessage(err)
+              );
             }
           }
-        } catch (e) {
-          console.warn('Failed to download image for', row.image_url, e)
+        } catch (e: unknown) {
+          console.warn(
+            "Failed to download image for",
+            row.image_url,
+            extractErrorMessage(e)
+          );
         }
 
-        mapped.push(art)
+        mapped.push(art);
       }
 
-      setArtworks(mapped)
-    } catch (e: any) {
-      console.error(e)
-      setError(e?.message || 'Failed to load artworks')
+      setArtworks(mapped);
+    } catch (e: unknown) {
+      console.error(e);
+      setError(extractErrorMessage(e) || "Failed to load artworks");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  React.useEffect(() => {
-    fetchArtworks()
+  useEffect(() => {
+    fetchArtworks();
     return () => {
       // Revoke any object URLs on unmount
-      artworks.forEach((a) => { if (a.image) URL.revokeObjectURL(a.image) })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+      artworks.forEach((a) => {
+        if (a.image) URL.revokeObjectURL(a.image);
+      });
+    };
+  }, []);
 
   const toggleLike = (id: string) => {
-    setFlags((prev) => ({ ...prev, [id]: { ...(prev[id] || { liked: false, saved: false }), liked: !(prev[id]?.liked || false) } }));
+    setFlags((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] || { liked: false, saved: false }),
+        liked: !(prev[id]?.liked || false),
+      },
+    }));
   };
 
   const toggleSave = (id: string) => {
-    setFlags((prev) => ({ ...prev, [id]: { ...(prev[id] || { liked: false, saved: false }), saved: !(prev[id]?.saved || false) } }));
+    setFlags((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] || { liked: false, saved: false }),
+        saved: !(prev[id]?.saved || false),
+      },
+    }));
   };
 
   return (
     <div className="min-h-screen w-full bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-40 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
@@ -195,43 +242,41 @@ const page = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Artwork Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {(
-            artworks.filter((a) => {
+          {artworks
+            .filter((a) => {
               const q = query.trim().toLowerCase();
               if (!q) return true;
               const title = (a.title || "").toLowerCase();
               const username = (a.username || a.user_id || "").toLowerCase();
               return title.includes(q) || username.includes(q);
             })
-          ).map((artwork) => {
-            const f = flags[artwork.id] || { liked: false, saved: false }
-            const ui: UIArtwork = {
-              id: artwork.id,
-              title: artwork.title,
-              artistName: artwork.username || artwork.user_id,
-              artistId: artwork.user_id,
-              image: artwork.image || '/placeholder.svg',
-              height: 'h-80',
-              liked: f.liked,
-              saved: f.saved,
-            }
-            return (
-              <ArtworkCard
-                key={artwork.id}
-                artwork={ui}
-                onToggleLike={toggleLike}
-                onToggleSave={toggleSave}
-              />
-            )
-          })}
+            .map((artwork) => {
+              const f = flags[artwork.id] || { liked: false, saved: false };
+              const ui: UIArtwork = {
+                id: artwork.id,
+                title: artwork.title,
+                artistName: artwork.username || artwork.user_id,
+                artistId: artwork.user_id,
+                image: artwork.image || "/placeholder.svg",
+                height: "h-80",
+                liked: f.liked,
+                saved: f.saved,
+              };
+              return (
+                <ArtworkCard
+                  key={artwork.id}
+                  artwork={ui}
+                  onToggleLike={toggleLike}
+                  onToggleSave={toggleSave}
+                />
+              );
+            })}
         </div>
       </main>
     </div>
   );
 };
 
-export default page;
+export default Page;

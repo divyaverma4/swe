@@ -5,7 +5,9 @@ function layout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="h-screen text-white flex">
       <NavBar />
-      {children}
+      <div className="flex-1 overflow-auto ml-24">
+        {children}
+      </div>
     </div>
   );
 }
