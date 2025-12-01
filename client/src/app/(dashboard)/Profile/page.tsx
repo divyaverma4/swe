@@ -61,7 +61,7 @@ const Page = () => {
         // Fetch profile
         const { data: prof } = await supabase
           .from("profiles")
-          .select("id, username, bio, email, instagram, website, profile_image")
+          .select("*")
           .eq("id", userId)
           .single()
         if (mounted) setProfile(prof || { id: userId, username: "User" })
