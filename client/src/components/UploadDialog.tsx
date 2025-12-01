@@ -163,6 +163,7 @@ const UploadDialog = ({ onUpload }: UploadDialogProps) => {
         <DialogTrigger asChild>
           <Button variant="outline">
             <SquarePlus />
+            Upload
           </Button>
         </DialogTrigger>
 

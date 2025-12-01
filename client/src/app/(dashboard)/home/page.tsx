@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Heart, Bookmark, Upload } from "lucide-react";
+import { Heart, Bookmark, SquarePlus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import UploadDialog from "@/components/UploadDialog";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 
 interface Artwork {
@@ -105,6 +106,7 @@ const Page = () => {
   const [flags, setFlags] = useState<
     Record<string, { liked: boolean; saved: boolean }>
   >({});
+  const [isCreator, setIsCreator] = useState(false);
 
   const fetchArtworks = async () => {
     setLoading(true);
@@ -120,6 +122,23 @@ const Page = () => {
       }
 
       const userId = sessionData.session.user?.id;
+
+      // Determine whether this user has Creator user_type so we can enable uploads
+      try {
+        const { data: prof, error: profError } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', userId)
+          .single();
+        if (!profError && prof && (prof as any).user_type === 'creator') {
+          setIsCreator(true);
+        } else {
+          setIsCreator(false);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch profile user_type', e);
+        setIsCreator(false);
+      }
 
       const { data: rows, error: rowsError } = await supabase
         .from("artworks_with_username")
@@ -228,7 +247,7 @@ const Page = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-foreground">ARTichoke</h1>
-            <div className="flex gap-4">
+            <div className="flex items-center gap-4">
               <input
                 type="text"
                 value={query}
@@ -236,7 +255,16 @@ const Page = () => {
                 placeholder="Search artwork or author..."
                 className="px-4 py-2 rounded-full bg-muted text-foreground placeholder-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              <UploadDialog onUpload={fetchArtworks} />
+              {isCreator ? (
+                <UploadDialog onUpload={fetchArtworks} />
+              ) : (
+                <span title="Only Creators can upload" className="inline-block">
+                  <Button variant="outline" disabled className="text-foreground">
+                    <SquarePlus />
+                    Upload
+                  </Button>
+                </span>
+              )}
             </div>
           </div>
         </div>

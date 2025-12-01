@@ -128,7 +128,7 @@ export function EditProfileModal({ profile, onClose, onSave }: EditProfileModalP
 
         {error && <div className="text-destructive text-sm mb-4">{error}</div>}
 
-        <div className="flex gap-3 justify-end">
+        <div className="flex gap-3 justify-end text-black">
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>

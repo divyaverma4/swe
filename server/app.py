@@ -87,6 +87,26 @@ def upload_artwork():
     if not token:
         return jsonify({'message': 'Missing user token'}), 401
 
+    # Ensure user has Creator user_type
+    try:
+        profile_resp = supabase.table('profiles').select('user_type').eq('id', user_id).single().execute()
+        profile_data = getattr(profile_resp, 'data', None) or (profile_resp[0] if isinstance(profile_resp, (list, tuple)) and len(profile_resp) > 0 else None)
+        profile_err = getattr(profile_resp, 'error', None) or (profile_resp[1] if isinstance(profile_resp, (list, tuple)) and len(profile_resp) > 1 else None)
+        if profile_err:
+            print(f"[upload] error fetching profile user_type: {profile_err}")
+            return jsonify({'message': 'Failed to verify user role', 'error': str(profile_err)}), 500
+
+        user_type = None
+        if isinstance(profile_data, dict):
+            user_type = profile_data.get('user_type')
+
+        if user_type != 'Creator':
+            print(f"[upload] user {user_id} not authorized to upload (user_type={user_type})")
+            return jsonify({'message': 'Forbidden: only users with Creator user_type may upload'}), 403
+    except Exception as e:
+        print(f"[upload] exception checking user_type: {e}")
+        return jsonify({'message': 'Error verifying user role', 'error': str(e)}), 500
+
     if 'file' not in request.files:
         return jsonify({'message': 'No file part in request'}), 400
 

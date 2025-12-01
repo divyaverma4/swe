@@ -11,6 +11,7 @@ interface ProfileHeaderProps {
   email?: string
   instagram?: string
   website?: string
+  userType?: string
   canEdit?: boolean
   profileId?: string
   onProfileUpdate?: (updatedProfile: any) => void
@@ -23,6 +24,7 @@ export function ProfileHeader({
   email = "example@example.com",
   instagram = "@example",
   website = "www.example.com",
+  userType = "user",
   canEdit = false,
   profileId,
   onProfileUpdate,
@@ -35,6 +37,7 @@ export function ProfileHeader({
     email,
     instagram,
     website,
+    user_type: userType,
   })
 
   const handleProfileUpdate = (updatedProfile: any) => {
@@ -61,6 +64,10 @@ export function ProfileHeader({
             <div className="flex-1">
               <div className="flex items-center gap-4 mb-2">
                 <h1 className="text-4xl font-bold text-foreground">{currentProfile.username}</h1>
+                {/* Role badge */}
+                <span className="px-2 py-1 text-xs font-semibold rounded-md bg-muted text-muted-foreground">
+                  {(currentProfile as any).user_type === "creator" ? "Creator" : "User"}
+                </span>
                 {canEdit && (
                   <button
                     onClick={() => setIsEditOpen(true)}

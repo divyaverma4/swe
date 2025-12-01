@@ -20,6 +20,7 @@ type Profile = {
   instagram?: string
   website?: string
   profile_image?: string
+  user_type?: string
 }
 
 const extractErrorMessage = (e: unknown): string => {
@@ -64,7 +65,7 @@ const Page = () => {
           .select("*")
           .eq("id", userId)
           .single()
-        if (mounted) setProfile(prof || { id: userId, username: "User" })
+        if (mounted) setProfile(prof || { id: userId, username: "User", user_type: "user" })
 
         // Fetch user's artworks
         const { data: rows, error: rowsError } = await supabase
@@ -125,6 +126,7 @@ const Page = () => {
         email={profile?.email}
         instagram={profile?.instagram}
         website={profile?.website}
+        userType={profile?.user_type || "user"}
         canEdit={isCurrentUser}
         profileId={currentUserId || ""}
         onProfileUpdate={handleProfileUpdate}
