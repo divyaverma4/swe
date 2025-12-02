@@ -20,10 +20,10 @@ interface ProfileHeaderProps {
 export function ProfileHeader({
   name,
   profileImage,
-  bio = "Creator.",
-  email = "example@example.com",
-  instagram = "@example",
-  website = "www.example.com",
+  bio,
+  email,
+  instagram,
+  website,
   userType = "user",
   canEdit = false,
   profileId,
@@ -55,6 +55,7 @@ export function ProfileHeader({
               <Image
                 src={profileImage || "/placeholder.svg"}
                 alt={currentProfile.username}
+                unoptimized
                 fill
                 className="object-cover"
               />
@@ -78,16 +79,20 @@ export function ProfileHeader({
                 )}
               </div>
 
-              <p className="text-muted-foreground mb-4">{currentProfile.bio}</p>
+              {currentProfile.bio && (
+                <p className="text-muted-foreground mb-4">{currentProfile.bio}</p>
+              )}
 
               {/* Contact / Links */}
               <div className="flex flex-wrap gap-4">
-                <a
-                  href={`mailto:${currentProfile.email}`}
-                  className="px-4 py-2 bg-accent text-background rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  Contact Artist
-                </a>
+                {currentProfile.email && (
+                  <a
+                    href={`mailto:${currentProfile.email}`}
+                    className="px-4 py-2 bg-accent text-background rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+                  >
+                    Contact Artist
+                  </a>
+                )}
 
                 {currentProfile.instagram && (
                   <a

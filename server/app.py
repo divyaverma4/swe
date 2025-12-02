@@ -213,5 +213,122 @@ def get_profile():
         return jsonify({'message': 'Error fetching profile', 'error': str(e)}), 500
 
 
+def _parse_resp_single(resp):
+    # Helper to extract a single row from supabase client response
+    data = getattr(resp, 'data', None)
+    if isinstance(data, list) and len(data) > 0:
+        return data[0]
+    if isinstance(data, dict):
+        return data
+    # some client wrappers return tuple/list
+    try:
+        if isinstance(resp, (list, tuple)) and len(resp) > 0:
+            return resp[0]
+    except Exception:
+        pass
+    return None
+
+
+@app.route('/artist-resolver')
+def artist_resolver():
+    """Resolve a handle or id to a public profile and artworks using the service role.
+    Public endpoint (no token) but uses service role on server to bypass RLS safely.
+    Query param: ?handle=<handle-or-id>
+    Returns JSON: { profile: {...} | null, artworks: [...] }
+    """
+    if not supabase:
+        return jsonify({'message': 'Database client not initialized'}), 500
+
+    handle = request.args.get('handle')
+    if not handle:
+        return jsonify({'message': 'handle query parameter required'}), 400
+
+    try:
+        print(f"[artist_resolver] incoming handle={handle}", flush=True)
+        profile = None
+
+        # local helper to serialize rows to JSON-safe dicts
+        def _serialize_row(row):
+            if not isinstance(row, dict):
+                return row
+            out = {}
+            for k, v in row.items():
+                try:
+                    # datetimes -> isoformat
+                    if hasattr(v, 'isoformat'):
+                        out[k] = v.isoformat()
+                    else:
+                        out[k] = v
+                except Exception:
+                    out[k] = str(v)
+            return out
+
+        # 1) try by handle
+        resp = supabase.table('profiles').select('*').eq('handle', handle).limit(1).execute()
+        profile = _parse_resp_single(resp)
+        print(f"[artist_resolver] by handle -> {bool(profile)}", flush=True)
+
+        # 2) try by id if input looks like uuid
+        import re
+        if not profile and re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', handle, re.I):
+            resp = supabase.table('profiles').select('*').eq('id', handle).limit(1).execute()
+            profile = _parse_resp_single(resp)
+            print(f"[artist_resolver] by id -> {bool(profile)}", flush=True)
+
+        # 3) try by username
+        if not profile:
+            resp = supabase.table('profiles').select('*').eq('username', handle).limit(1).execute()
+            profile = _parse_resp_single(resp)
+            print(f"[artist_resolver] by username -> {bool(profile)}", flush=True)
+
+        # 4) resolve via artworks_with_username view
+        if not profile:
+            resp = supabase.table('artworks_with_username').select('user_id').eq('handle', handle).limit(1).execute()
+            row = _parse_resp_single(resp)
+            if not row:
+                resp = supabase.table('artworks_with_username').select('user_id').eq('username', handle).limit(1).execute()
+                row = _parse_resp_single(resp)
+            print(f"[artist_resolver] artworks view resolved -> {bool(row)}", flush=True)
+            if row and row.get('user_id'):
+                resp = supabase.table('profiles').select('*').eq('id', row.get('user_id')).limit(1).execute()
+                profile = _parse_resp_single(resp)
+
+        # Fetch artworks for the user (if profile found), else attempt to fetch artworks matching the handle
+        artworks = []
+        if profile and profile.get('id'):
+            resp = supabase.table('artworks').select('*').eq('user_id', profile.get('id')).execute()
+            data = getattr(resp, 'data', None)
+            if isinstance(data, list):
+                try:
+                    artworks = sorted(data, key=lambda r: r.get('created_at') or '', reverse=True)
+                except Exception:
+                    artworks = data
+        else:
+            resp = supabase.table('artworks_with_username').select('*').eq('handle', handle).execute()
+            data = getattr(resp, 'data', None)
+            if isinstance(data, list) and len(data) > 0:
+                try:
+                    artworks = sorted(data, key=lambda r: r.get('created_at') or '', reverse=True)
+                except Exception:
+                    artworks = data
+            else:
+                resp = supabase.table('artworks_with_username').select('*').eq('username', handle).execute()
+                data = getattr(resp, 'data', None)
+                if isinstance(data, list) and len(data) > 0:
+                    try:
+                        artworks = sorted(data, key=lambda r: r.get('created_at') or '', reverse=True)
+                    except Exception:
+                        artworks = data
+
+        # Serialize to JSON-safe structures
+        prof_out = _serialize_row(profile) if profile else None
+        arts_out = [_serialize_row(a) for a in artworks]
+        print(f"[artist_resolver] returning profile={bool(prof_out)} artworks={len(arts_out)}", flush=True)
+        return jsonify({'profile': prof_out, 'artworks': arts_out}), 200
+    except Exception as e:
+        print(f"artist_resolver error: {e}", flush=True)
+        return jsonify({'message': 'Error resolving artist', 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

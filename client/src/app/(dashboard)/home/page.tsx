@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Heart, Bookmark, SquarePlus } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+
 import UploadDialog from "@/components/UploadDialog";
+// Dialog removed: avatar now links to artist page instead of opening a popup
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 
@@ -13,9 +15,11 @@ interface Artwork {
   title: string;
   user_id: string;
   username?: string;
+  handle?: string | null;
   image_url: string;
   image?: string;
   tags?: string[] | null;
+  avatar_url?: string | null;
   is_public?: boolean;
 }
 
@@ -23,13 +27,22 @@ type UIArtwork = {
   id: string;
   title: string;
   artistName: string;
-  artistId: string;
+  artistHandle: string;
   image: string;
   height?: string;
   liked?: boolean;
   saved?: boolean;
   tags?: string[] | null;
+  artistAvatar?: string | null;
 };
+
+interface Profile {
+  username?: string;
+  avatar_url?: string;
+  bio?: string;
+  website?: string;
+  user_type?: string;
+}
 
 const extractErrorMessage = (e: unknown): string => {
   if (e instanceof Error) return e.message;
@@ -52,11 +65,13 @@ function ArtworkCard({
 }) {
   return (
     <div className="w-full max-w-md mx-auto bg-muted rounded-xl overflow-hidden shadow-md">
-      <Link href={`/artist/${artwork.artistId}`}>
+      <Link href={`/artist/${artwork.artistHandle}`}>
         <div className="relative">
-          <img
+          <Image
             src={artwork.image || "/placeholder.svg"}
             alt={artwork.title}
+            width={400}
+            height={320}
             className="w-full h-80 object-cover"
           />
           {/* Action buttons */}
@@ -92,37 +107,48 @@ function ArtworkCard({
       </Link>
       <div className="p-4">
         <h3 className="font-bold text-lg text-foreground">{artwork.title}</h3>
-            <p className="text-sm text-muted-foreground">by {artwork.artistName}</p>
-            {artwork.tags && artwork.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {artwork.tags.map((t) => (
-                  <span
-                    key={t}
-                    className="inline-block text-xs bg-gray-200 text-gray-800 px-2 py-1 rounded-full"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-            )}
+        <div className="flex items-center gap-2">
+          <Link href={`/artist/${artwork.artistHandle}`} className="inline-block">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+              {artwork.artistAvatar ? (
+                <Image src={artwork.artistAvatar} alt={artwork.artistName} width={32} height={32} unoptimized className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs text-gray-600">{(artwork.artistName || "?").slice(0,2).toUpperCase()}</span>
+              )}
+            </div>
+          </Link>
+          <p className="text-sm text-muted-foreground">by {artwork.artistName}</p>
+        </div>
+        {artwork.tags && artwork.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {artwork.tags.map((t) => (
+              <span
+                key={t}
+                className="inline-block text-xs bg-gray-200 text-gray-800 px-2 py-1 rounded-full"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 const Page = () => {
-  const searchParams = useSearchParams();
-  const loginType = searchParams.get("type"); // "user" or "creator"
-  const [artworks, setArtworks] = useState<Artwork[]>([]);
+  const [artworks, setArtworks] = useState<Artwork[]>([]);  
   const [query, setQuery] = useState<string>("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setLoading] = useState(false);
+  const [, setError] = useState<string | null>(null);
   const [flags, setFlags] = useState<
     Record<string, { liked: boolean; saved: boolean }>
   >({});
   const [isCreator, setIsCreator] = useState(false);
 
-  const fetchArtworks = async () => {
+  const objectUrlsRef = useRef<string[]>([]);
+
+  const fetchArtworks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -143,8 +169,8 @@ const Page = () => {
           .from('profiles')
           .select('user_type')
           .eq('id', userId)
-          .single();
-        if (!profError && prof && (prof as any).user_type === 'creator') {
+          .maybeSingle();
+        if (!profError && prof && (prof as Profile).user_type === 'creator') {
           setIsCreator(true);
         } else {
           setIsCreator(false);
@@ -160,9 +186,9 @@ const Page = () => {
         .order("created_at", { ascending: false });
       if (rowsError) throw rowsError;
 
-      artworks.forEach((a) => {
-        if (a.image) URL.revokeObjectURL(a.image);
-      });
+      // Revoke any previously created object URLs and clear the list
+      objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      objectUrlsRef.current = [];
 
       const mapped: Artwork[] = [];
       for (const row of rows) {
@@ -175,6 +201,8 @@ const Page = () => {
           image_url: row.image_url,
           is_public: row.is_public,
           tags: row.tags || null,
+          avatar_url: row.avatar_url || row.avatar || null,
+          handle: row.handle || null,
         };
 
         try {
@@ -184,6 +212,7 @@ const Page = () => {
           if (!fileError && file) {
             const url = URL.createObjectURL(file);
             art.image = url;
+            objectUrlsRef.current.push(url);
           } else {
             // fallback: ask backend for a signed URL
             try {
@@ -224,17 +253,16 @@ const Page = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchArtworks();
     return () => {
       // Revoke any object URLs on unmount
-      artworks.forEach((a) => {
-        if (a.image) URL.revokeObjectURL(a.image);
-      });
+      objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      objectUrlsRef.current = [];
     };
-  }, []);
+  }, [fetchArtworks]);
 
   const toggleLike = (id: string) => {
     setFlags((prev) => ({
@@ -310,12 +338,13 @@ const Page = () => {
                 id: artwork.id,
                 title: artwork.title,
                 artistName: artwork.username || artwork.user_id,
-                artistId: artwork.user_id,
+                artistHandle: artwork.handle || artwork.user_id,
                 image: artwork.image || "/placeholder.svg",
                 height: "h-80",
                 liked: f.liked,
                 saved: f.saved,
                 tags: artwork.tags || [],
+                artistAvatar: artwork.avatar_url || null,
               };
               return (
                 <ArtworkCard
@@ -333,3 +362,4 @@ const Page = () => {
 };
 
 export default Page;
+  

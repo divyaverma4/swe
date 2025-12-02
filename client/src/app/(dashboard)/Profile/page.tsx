@@ -64,7 +64,7 @@ const Page = () => {
           .from("profiles")
           .select("*")
           .eq("id", userId)
-          .single()
+          .maybeSingle()
         if (mounted) setProfile(prof || { id: userId, username: "User", user_type: "user" })
 
         // Fetch user's artworks
@@ -122,10 +122,10 @@ const Page = () => {
       <ProfileHeader
         name={profile?.username || "Artist"}
         profileImage={profile?.profile_image || "/placeholder.svg"}
-        bio={profile?.bio || "Passionate artist creating beautiful artwork"}
-        email={profile?.email}
-        instagram={profile?.instagram}
-        website={profile?.website}
+        bio={profile?.bio || ""}
+        email={profile?.email || ""}
+        instagram={profile?.instagram || ""}
+        website={profile?.website || ""}
         userType={profile?.user_type || "user"}
         canEdit={isCurrentUser}
         profileId={currentUserId || ""}

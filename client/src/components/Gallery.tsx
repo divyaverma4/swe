@@ -24,6 +24,7 @@ export function ArtworkGallery({ artworks }: ArtworkGalleryProps) {
                   alt={artwork.title}
                   width={400}
                   height={artwork.height}
+                  unoptimized
                   className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>
