@@ -100,7 +100,7 @@ def upload_artwork():
         if isinstance(profile_data, dict):
             user_type = profile_data.get('user_type')
 
-        if user_type != 'Creator':
+        if user_type != 'creator':
             print(f"[upload] user {user_id} not authorized to upload (user_type={user_type})")
             return jsonify({'message': 'Forbidden: only users with Creator user_type may upload'}), 403
     except Exception as e:
@@ -140,15 +140,23 @@ def upload_artwork():
 
     title = request.form.get('title') or 'Untitled'
     description = request.form.get('description') or ''
+    # Tags may be provided as a comma-separated string. Convert to list (trimmed, skip empty).
+    tags_raw = request.form.get('tags') or ''
+    tags = [t.strip() for t in tags_raw.split(',') if t.strip()]
 
     try:
-        insert_resp = supabase.table('artworks').insert({
+        insert_payload = {
             'user_id': user_id,
             'title': title,
             'description': description,
             'image_url': object_path,
             'is_public': True
-        }).execute()
+        }
+        # If tags were provided, include them. The table should have a `tags` column (text[] or json).
+        if tags:
+            insert_payload['tags'] = tags
+
+        insert_resp = supabase.table('artworks').insert(insert_payload).execute()
 
         print(f"[upload] insert_resp: {insert_resp}")
         data = getattr(insert_resp, 'data', None) or (insert_resp[0] if isinstance(insert_resp, (list, tuple)) and len(insert_resp) > 0 else None)

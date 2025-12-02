@@ -15,6 +15,7 @@ interface Artwork {
   username?: string;
   image_url: string;
   image?: string;
+  tags?: string[] | null;
   is_public?: boolean;
 }
 
@@ -27,6 +28,7 @@ type UIArtwork = {
   height?: string;
   liked?: boolean;
   saved?: boolean;
+  tags?: string[] | null;
 };
 
 const extractErrorMessage = (e: unknown): string => {
@@ -90,7 +92,19 @@ function ArtworkCard({
       </Link>
       <div className="p-4">
         <h3 className="font-bold text-lg text-foreground">{artwork.title}</h3>
-        <p className="text-sm text-muted-foreground">by {artwork.artistName}</p>
+            <p className="text-sm text-muted-foreground">by {artwork.artistName}</p>
+            {artwork.tags && artwork.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {artwork.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-block text-xs bg-gray-200 text-gray-800 px-2 py-1 rounded-full"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
       </div>
     </div>
   );
@@ -160,6 +174,7 @@ const Page = () => {
             row.username || (row.user_id === userId ? "You" : row.user_id),
           image_url: row.image_url,
           is_public: row.is_public,
+          tags: row.tags || null,
         };
 
         try {
@@ -252,7 +267,7 @@ const Page = () => {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search artwork or author..."
+                placeholder="Search artwork, author, or tags..."
                 className="px-4 py-2 rounded-full bg-muted text-foreground placeholder-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
               />
               {isCreator ? (
@@ -278,7 +293,16 @@ const Page = () => {
               if (!q) return true;
               const title = (a.title || "").toLowerCase();
               const username = (a.username || a.user_id || "").toLowerCase();
-              return title.includes(q) || username.includes(q);
+              // check title or username
+              if (title.includes(q) || username.includes(q)) return true;
+              // check tags (tags may be array or null)
+              const tags = a.tags || [];
+              if (Array.isArray(tags)) {
+                for (const t of tags) {
+                  if ((t || "").toLowerCase().includes(q)) return true;
+                }
+              }
+              return false;
             })
             .map((artwork) => {
               const f = flags[artwork.id] || { liked: false, saved: false };
@@ -291,6 +315,7 @@ const Page = () => {
                 height: "h-80",
                 liked: f.liked,
                 saved: f.saved,
+                tags: artwork.tags || [],
               };
               return (
                 <ArtworkCard

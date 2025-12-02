@@ -28,6 +28,7 @@ const UploadDialog = ({ onUpload }: UploadDialogProps) => {
     title: "",
     description: "",
     image: null as File | null,
+    tags: "",
   })
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -113,6 +114,8 @@ const UploadDialog = ({ onUpload }: UploadDialogProps) => {
       const fd = new FormData()
       fd.append("title", formData.title)
       fd.append("description", formData.description)
+      // send tags as comma-separated string; backend will parse into list
+      fd.append("tags", formData.tags || "")
       // use key 'file' on the backend
       fd.append("file", formData.image)
 
@@ -145,7 +148,7 @@ const UploadDialog = ({ onUpload }: UploadDialogProps) => {
       }
 
       setSuccess(true)
-      setFormData({ title: "", description: "", image: null })
+      setFormData({ title: "", description: "", image: null, tags: "" })
       setError("")
       // call optional callback so page can refresh the gallery
       if (onUpload) await onUpload()
@@ -235,6 +238,23 @@ const UploadDialog = ({ onUpload }: UploadDialogProps) => {
                   onChange={handleInputChange}
                   className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full"
                 />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              <Label htmlFor="tags" className="sm:w-1/4 w-full sm:text-right text-left pt-2">
+                Tags
+              </Label>
+              <div className="sm:w-3/4 w-full">
+                <Input
+                  id="tags"
+                  name="tags"
+                  placeholder="comma-separated tags (e.g. portrait, oil, abstract)"
+                  value={formData.tags}
+                  onChange={handleInputChange}
+                  className="w-full"
+                />
+                <div className="text-sm text-muted-foreground mt-1">Add tags to help users find your artwork.</div>
               </div>
             </div>
 
