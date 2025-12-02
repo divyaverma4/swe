@@ -1,14 +1,12 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { Heart, Bookmark, SquarePlus } from "lucide-react";
+import { SquarePlus } from "lucide-react";
 
 import UploadDialog from "@/components/UploadDialog";
-// Dialog removed: avatar now links to artist page instead of opening a popup
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
+import { ArtworkCard, type UIArtwork } from "@/components/ArtworkCard";
 
 interface Artwork {
   id: string;
@@ -22,19 +20,6 @@ interface Artwork {
   avatar_url?: string | null;
   is_public?: boolean;
 }
-
-type UIArtwork = {
-  id: string;
-  title: string;
-  artistName: string;
-  artistHandle: string;
-  image: string;
-  height?: string;
-  liked?: boolean;
-  saved?: boolean;
-  tags?: string[] | null;
-  artistAvatar?: string | null;
-};
 
 interface Profile {
   username?: string;
@@ -54,96 +39,15 @@ const extractErrorMessage = (e: unknown): string => {
   }
 };
 
-function ArtworkCard({
-  artwork,
-  onToggleLike,
-  onToggleSave,
-}: {
-  artwork: UIArtwork;
-  onToggleLike: (id: string) => void;
-  onToggleSave: (id: string) => void;
-}) {
-  return (
-    <div className="w-full max-w-md mx-auto bg-muted rounded-xl overflow-hidden shadow-md">
-      <Link href={`/artist/${artwork.artistHandle}`}>
-        <div className="relative">
-          <Image
-            src={artwork.image || "/placeholder.svg"}
-            alt={artwork.title}
-            width={400}
-            height={320}
-            className="w-full h-80 object-cover"
-          />
-          {/* Action buttons */}
-          <div className="absolute top-3 right-3 flex gap-2">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                onToggleSave(artwork.id);
-              }}
-              className="p-2 rounded-full bg-white/90 text-foreground hover:bg-white shadow-lg"
-            >
-              <Bookmark
-                className={`w-5 h-5 ${artwork.saved ? "fill-foreground" : ""}`}
-              />
-            </button>
-          </div>
-          <div className="absolute bottom-3 left-3">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                onToggleLike(artwork.id);
-              }}
-              className="p-2 rounded-full bg-white/90 text-foreground hover:bg-white shadow-lg"
-            >
-              <Heart
-                className={`w-5 h-5 ${
-                  artwork.liked ? "fill-destructive text-destructive" : ""
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-      </Link>
-      <div className="p-4">
-        <h3 className="font-bold text-lg text-foreground">{artwork.title}</h3>
-        <div className="flex items-center gap-2">
-          <Link href={`/artist/${artwork.artistHandle}`} className="inline-block">
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-              {artwork.artistAvatar ? (
-                <Image src={artwork.artistAvatar} alt={artwork.artistName} width={32} height={32} unoptimized className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-xs text-gray-600">{(artwork.artistName || "?").slice(0,2).toUpperCase()}</span>
-              )}
-            </div>
-          </Link>
-          <p className="text-sm text-muted-foreground">by {artwork.artistName}</p>
-        </div>
-        {artwork.tags && artwork.tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {artwork.tags.map((t) => (
-              <span
-                key={t}
-                className="inline-block text-xs bg-gray-200 text-gray-800 px-2 py-1 rounded-full"
-              >
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// ArtworkCard component moved to /components/ArtworkCard.tsx
 
 const Page = () => {
-  const [artworks, setArtworks] = useState<Artwork[]>([]);  
+  const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [query, setQuery] = useState<string>("");
   const [, setLoading] = useState(false);
   const [, setError] = useState<string | null>(null);
-  const [flags, setFlags] = useState<
-    Record<string, { liked: boolean; saved: boolean }>
-  >({});
+  const [likedArtworkIds, setLikedArtworkIds] = useState<Set<string>>(new Set());
+  const [savedArtworkIds, setSavedArtworkIds] = useState<Set<string>>(new Set());
   const [isCreator, setIsCreator] = useState(false);
 
   const objectUrlsRef = useRef<string[]>([]);
@@ -247,6 +151,34 @@ const Page = () => {
       }
 
       setArtworks(mapped);
+
+      // Fetch user's existing likes and saves
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentUserId = sessionData?.session?.user?.id;
+
+        if (currentUserId) {
+          const { data: likesData } = await supabase
+            .from("likes")
+            .select("artwork_id")
+            .eq("user_id", currentUserId);
+
+          if (likesData) {
+            setLikedArtworkIds(new Set(likesData.map(l => l.artwork_id)));
+          }
+
+          const { data: savesData } = await supabase
+            .from("saves")
+            .select("artwork_id")
+            .eq("user_id", currentUserId);
+
+          if (savesData) {
+            setSavedArtworkIds(new Set(savesData.map(s => s.artwork_id)));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch likes/saves', e);
+      }
     } catch (e: unknown) {
       console.error(e);
       setError(extractErrorMessage(e) || "Failed to load artworks");
@@ -264,24 +196,84 @@ const Page = () => {
     };
   }, [fetchArtworks]);
 
-  const toggleLike = (id: string) => {
-    setFlags((prev) => ({
-      ...prev,
-      [id]: {
-        ...(prev[id] || { liked: false, saved: false }),
-        liked: !(prev[id]?.liked || false),
-      },
-    }));
+  const toggleLike = async (id: string) => {
+    const supabase = createClient();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return;
+
+    const isLiked = likedArtworkIds.has(id);
+
+    // Optimistic update
+    setLikedArtworkIds(prev => {
+      const newSet = new Set(prev);
+      if (isLiked) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+
+    try {
+      if (isLiked) {
+        await supabase.from("likes").delete().match({ user_id: userId, artwork_id: id });
+      } else {
+        await supabase.from("likes").insert({ user_id: userId, artwork_id: id });
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      // Revert on error
+      setLikedArtworkIds(prev => {
+        const newSet = new Set(prev);
+        if (isLiked) {
+          newSet.add(id);
+        } else {
+          newSet.delete(id);
+        }
+        return newSet;
+      });
+    }
   };
 
-  const toggleSave = (id: string) => {
-    setFlags((prev) => ({
-      ...prev,
-      [id]: {
-        ...(prev[id] || { liked: false, saved: false }),
-        saved: !(prev[id]?.saved || false),
-      },
-    }));
+  const toggleSave = async (id: string) => {
+    const supabase = createClient();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return;
+
+    const isSaved = savedArtworkIds.has(id);
+
+    // Optimistic update
+    setSavedArtworkIds(prev => {
+      const newSet = new Set(prev);
+      if (isSaved) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+
+    try {
+      if (isSaved) {
+        await supabase.from("saves").delete().match({ user_id: userId, artwork_id: id });
+      } else {
+        await supabase.from("saves").insert({ user_id: userId, artwork_id: id });
+      }
+    } catch (error) {
+      console.error("Error toggling save:", error);
+      // Revert on error
+      setSavedArtworkIds(prev => {
+        const newSet = new Set(prev);
+        if (isSaved) {
+          newSet.add(id);
+        } else {
+          newSet.delete(id);
+        }
+        return newSet;
+      });
+    }
   };
 
   return (
@@ -333,7 +325,6 @@ const Page = () => {
               return false;
             })
             .map((artwork) => {
-              const f = flags[artwork.id] || { liked: false, saved: false };
               const ui: UIArtwork = {
                 id: artwork.id,
                 title: artwork.title,
@@ -341,8 +332,8 @@ const Page = () => {
                 artistHandle: artwork.handle || artwork.user_id,
                 image: artwork.image || "/placeholder.svg",
                 height: "h-80",
-                liked: f.liked,
-                saved: f.saved,
+                liked: likedArtworkIds.has(artwork.id),
+                saved: savedArtworkIds.has(artwork.id),
                 tags: artwork.tags || [],
                 artistAvatar: artwork.avatar_url || null,
               };
@@ -362,4 +353,4 @@ const Page = () => {
 };
 
 export default Page;
-  
+

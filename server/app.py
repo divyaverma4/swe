@@ -170,6 +170,60 @@ def upload_artwork():
         return jsonify({'message': 'Error inserting artwork', 'error': str(e)}), 500
 
 
+@app.route('/upload-avatar', methods=['POST'])
+@token_required
+def upload_avatar():
+    if not supabase:
+        return jsonify({'message': 'Database client not initialized'}), 500
+
+    user_id = g.user.get('sub')
+    
+    if 'file' not in request.files:
+        return jsonify({'message': 'No file part in request'}), 400
+
+    file = request.files['file']
+    filename = file.filename
+    if not filename:
+        return jsonify({'message': 'File must have a filename'}), 400
+
+    # Generate unique filename
+    import time
+    file_ext = filename.split('.')[-1] if '.' in filename else 'jpg'
+    object_path = f"{user_id}/{int(time.time() * 1000)}.{file_ext}"
+
+    # Upload to Supabase Storage using SERVICE role to bypass RLS
+    upload_url = f"{SUPABASE_URL}/storage/v1/object/avatars/{object_path}"
+
+    headers = {
+        'Authorization': f'Bearer {SUPABASE_SERVICE_KEY}',
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Content-Type': file.content_type or 'application/octet-stream'
+    }
+
+    try:
+        print(f"[upload-avatar] user_id={user_id} filename={filename} object_path={object_path}")
+        resp = requests.post(upload_url, data=file.read(), headers=headers)
+        print(f"[upload-avatar] storage response status={resp.status_code} text={resp.text}")
+        if not resp.ok:
+            return jsonify({'message': 'Failed to upload to storage', 'status_code': resp.status_code, 'body': resp.text}), 500
+    except Exception as e:
+        print(f"[upload-avatar] exception during upload: {e}")
+        return jsonify({'message': 'Error uploading to storage', 'error': str(e)}), 500
+
+    # Get public URL
+    public_url = f"{SUPABASE_URL}/storage/v1/object/public/avatars/{object_path}"
+
+    # Update user's profile with new avatar_url
+    try:
+        update_resp = supabase.table('profiles').update({'avatar_url': public_url}).eq('id', user_id).execute()
+        print(f"[upload-avatar] profile update response: {update_resp}")
+        
+        return jsonify({'message': 'Avatar uploaded successfully', 'avatar_url': public_url}), 200
+    except Exception as e:
+        print(f"[upload-avatar] error updating profile: {e}")
+        return jsonify({'message': 'Avatar uploaded but failed to update profile', 'error': str(e), 'avatar_url': public_url}), 500
+
+
 @app.route('/signed-url')
 @token_required
 def signed_url():

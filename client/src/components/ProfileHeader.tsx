@@ -1,16 +1,13 @@
 "use client"
 
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { EditProfileModal } from "./EditProfile"
 
 interface ProfileHeaderProps {
   name: string
   profileImage: string
   bio?: string
-  email?: string
-  instagram?: string
-  website?: string
   userType?: string
   canEdit?: boolean
   profileId?: string
@@ -21,9 +18,6 @@ export function ProfileHeader({
   name,
   profileImage,
   bio,
-  email,
-  instagram,
-  website,
   userType = "user",
   canEdit = false,
   profileId,
@@ -34,11 +28,20 @@ export function ProfileHeader({
     id: profileId || "",
     username: name,
     bio,
-    email,
-    instagram,
-    website,
     user_type: userType,
+    avatar_url: profileImage,
   })
+
+  // Sync state with props when they change
+  useEffect(() => {
+    setCurrentProfile(prev => ({
+      ...prev,
+      username: name,
+      bio,
+      user_type: userType,
+      avatar_url: profileImage,
+    }))
+  }, [name, bio, userType, profileImage])
 
   const handleProfileUpdate = (updatedProfile: any) => {
     setCurrentProfile(updatedProfile)
@@ -51,14 +54,32 @@ export function ProfileHeader({
         <div className="max-w-6xl mx-auto px-6 py-12">
           <div className="flex flex-col md:flex-row items-start gap-8 mb-8">
             {/* Profile Image */}
-            <div className="relative w-24 h-24 rounded-full overflow-hidden flex-shrink-0 border border-gray-300 dark:border-gray-600">
-              <Image
-                src={profileImage || "/placeholder.svg"}
-                alt={currentProfile.username}
-                unoptimized
-                fill
-                className="object-cover"
-              />
+            <div className="relative w-24 h-24 rounded-full overflow-hidden flex-shrink-0 border border-gray-300 dark:border-gray-600 bg-muted flex items-center justify-center">
+              {currentProfile.avatar_url && currentProfile.avatar_url !== "/placeholder.svg" ? (
+                <Image
+                  src={currentProfile.avatar_url}
+                  alt={currentProfile.username}
+                  unoptimized
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-12 h-12 text-gray-400"
+                  >
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+              )}
             </div>
 
             {/* Profile Info */}
@@ -82,40 +103,6 @@ export function ProfileHeader({
               {currentProfile.bio && (
                 <p className="text-muted-foreground mb-4">{currentProfile.bio}</p>
               )}
-
-              {/* Contact / Links */}
-              <div className="flex flex-wrap gap-4">
-                {currentProfile.email && (
-                  <a
-                    href={`mailto:${currentProfile.email}`}
-                    className="px-4 py-2 bg-accent text-background rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
-                  >
-                    Contact Artist
-                  </a>
-                )}
-
-                {currentProfile.instagram && (
-                  <a
-                    href={`https://instagram.com/${currentProfile.instagram.replace("@", "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm font-medium"
-                  >
-                    {currentProfile.instagram}
-                  </a>
-                )}
-
-                {currentProfile.website && (
-                  <a
-                    href={`https://${currentProfile.website}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm font-medium"
-                  >
-                    Portfolio
-                  </a>
-                )}
-              </div>
             </div>
           </div>
         </div>
